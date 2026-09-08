@@ -2,7 +2,8 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB = credentials('dockerhub-creds')
+        DOCKERHUB = credentials('dockerhub-creds')   // Jenkins credential ID for DockerHub
+        EC2_HOST = "ubuntu@172-31-10-253"            // Your Ubuntu EC2 private IP
     }
 
     stages {
@@ -38,14 +39,15 @@ pipeline {
         }
 
         stage('Deploy to EC2') {
-            when {
-                branch 'main'
-            }
             steps {
-                sh """
-                    ssh -o StrictHostKeyChecking=no ubuntu@<EC2-IP> \
-                    'docker pull nawin28/prod:latest && docker run -d --rm -p 80:80 nawin28/prod:latest'
-                """
+                script {
+                    def branch = env.BRANCH_NAME
+                    def imageTag = branch == 'main' ? 'prod' : 'dev'
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${EC2_HOST} \
+                        'docker pull nawin28/${imageTag}:latest && docker rm -f reactapp || true && docker run -d --name reactapp -p 80:80 nawin28/${imageTag}:latest'
+                    """
+                }
             }
         }
     }
